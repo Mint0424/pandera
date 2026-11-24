@@ -359,6 +359,31 @@ def test_polars_user_parsers_run():
     assert out["a"].to_list() == ["x"]
 
 
+@pytest.mark.skipif(
+    CONFIG.use_narwhals_backend,
+    reason="native Polars field parser regression",
+)
+def test_polars_parser_skips_missing_optional_column():
+    from pandera.api.parsers import Parser
+
+    schema = DataFrameSchema(
+        {
+            "id": Column(pl.Int64),
+            "note": Column(
+                pl.String,
+                required=False,
+                parsers=Parser(lambda series: series.str.strip_chars()),
+            ),
+        }
+    )
+
+    data = pl.DataFrame({"id": [1]})
+    assert_frame_equal(schema.validate(data), data)
+
+    with_note = data.with_columns(pl.lit(" a ").alias("note"))
+    assert schema.validate(with_note)["note"].to_list() == ["a"]
+
+
 def test_missing_required_column_when_lazy_is_true():
     """Test missing required columns when lazy=True."""
     schema = DataFrameSchema(
