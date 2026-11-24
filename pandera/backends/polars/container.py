@@ -449,7 +449,7 @@ class DataFrameSchemaBackend(PolarsSchemaBackend):
         """
         compiled = compile_column_parsers(schema)
         field_parsers = [
-            (name, parser)
+            (name, column, parser)
             for name, column in (getattr(schema, "columns", {}) or {}).items()
             for parser in (getattr(column, "parsers", None) or [])
         ]
@@ -467,7 +467,13 @@ class DataFrameSchemaBackend(PolarsSchemaBackend):
             result = parser(out)
             out = result.parser_output  # type: ignore[assignment]
 
-        for name, parser in field_parsers:
+        for name, column, parser in field_parsers:
+            if (
+                not column.required
+                and not column.regex
+                and name not in out.columns
+            ):
+                continue
             result = parser(out, name)
             output = result.parser_output
             if isinstance(output, pl.Series):
